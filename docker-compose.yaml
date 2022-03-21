@@ -1,0 +1,68 @@
+version: '3.7'
+
+services:
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio
+    command: server --console-address ":9001" /data
+    expose:
+      - "9000"
+      - "9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    hostname: minio
+    volumes:
+      - ./minio/minio_data:/data
+    networks:
+      - my_network
+
+  nginx:
+    image: nginx:1.19.2-alpine
+    container_name: nginx
+    hostname: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      - minio
+    networks:
+      - my_network
+
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'db'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      - '3306:3306'
+    expose:
+      - '3306'
+    volumes:
+      - ./mysql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    networks:
+      - my_network
+
+  fastapi:
+    build: ./fastapi
+    container_name: fastapi
+    ports:
+      - '81:80'
+    expose:
+      - '81'
+    volumes:
+      - ./fastapi/app:/code/app
+      - ./fastapi/tests:/code/tests
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    name: my_network
+    driver: bridge

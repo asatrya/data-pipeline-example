@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# minio
+minio/minio_data/.minio.sys
+minio/minio_data/data/zone_01_raw/*
+!minio/minio_data/data/zone_01_raw/empty.txt
+!minio/minio_data/data/zone_01_raw/data.parquet.gzip
+minio/minio_data/data/zone_02_curated/*
+!minio/minio_data/data/zone_02_curated/empty.txt
+minio/minio_data/data/zone_03_provision/*
+!minio/minio_data/data/zone_03_provision/empty.txt
