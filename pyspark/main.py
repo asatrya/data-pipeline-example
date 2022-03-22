@@ -45,6 +45,19 @@ def job_curate(execution_date: str):
     df.write.mode("overwrite").partitionBy("execution_date").parquet("s3a://data/zone_02_curated/vouchers")
 
 
+def validate_curate(execution_date: str):
+    # read data
+    df_curated = spark.read.option("basePath", "s3a://data/zone_02_curated/vouchers/")\
+                            .parquet("s3a://data/zone_02_curated/vouchers/execution_date={}".format(execution_date.replace(':', '')))
+
+    # check all required columns are exist
+    columns_to_check = ['execution_date', 'country_code', 'last_order_ts', 'first_order_ts', 'total_orders', 'voucher_amount', 
+                        'frequent_segment', 'days_since_last_order', 'recency_segment']
+    for column in columns_to_check:
+        if column not in df_curated.columns:
+            raise Exception("Failed validate_curate: column '{}' is not exist".format(column))
+
+
 def job_aggregate_frequent_segment(execution_date: str):
     # read data
     df_curated = spark.read.option("basePath", "s3a://data/zone_02_curated/vouchers/")\
@@ -111,6 +124,30 @@ def job_aggregate_rencency_segment(execution_date: str):
                             .parquet("s3a://data/zone_03_provision/voucher_recency_most_used")
 
 
+def validate_aggregate_frequent_segment(execution_date: str):
+    # read data from provision zone
+    df_provision_voucher_frequent = spark.read.option("basePath", "s3a://data/zone_03_provision/voucher_frequent_most_used/")\
+                            .parquet("s3a://data/zone_03_provision/voucher_frequent_most_used/execution_date={}".format(execution_date.replace(':', '')))
+
+    # check all required columns are exist
+    columns_to_check = ['execution_date', 'country_code', 'frequent_segment', 'voucher_amount']
+    for column in columns_to_check:
+        if column not in df_provision_voucher_frequent.columns:
+            raise Exception("Failed validate_aggregate_frequent_segment: column '{}' is not exist".format(column))
+
+
+def validate_aggregate_recency_segment(execution_date: str):
+    # read data from provision zone
+    df_provision_voucher_recency = spark.read.option("basePath", "s3a://data/zone_03_provision/voucher_recency_most_used/")\
+                            .parquet("s3a://data/zone_03_provision/voucher_recency_most_used/execution_date={}".format(execution_date.replace(':', '')))
+
+    # check all required columns are exist
+    columns_to_check = ['execution_date', 'country_code', 'recency_segment', 'voucher_amount']
+    for column in columns_to_check:
+        if column not in df_provision_voucher_recency.columns:
+            raise Exception("Failed validate_aggregate_recency_segment: column '{}' is not exist".format(column))
+
+
 def job_publish_frequent_segment(execution_date: str):
     # read data from provision zone
     df_provision_voucher_frequent = spark.read.option("basePath", "s3a://data/zone_03_provision/voucher_frequent_most_used/")\
@@ -167,13 +204,17 @@ if __name__ == "__main__":
     ###################################
 
     job_curate(execution_date)
+    validate_curate(execution_date)
 
     ###################################
     # STEP 2: CURATED -> PROVISION: aggregation
     ###################################
 
     job_aggregate_frequent_segment(execution_date)
+    validate_aggregate_frequent_segment(execution_date)
+    
     job_aggregate_rencency_segment(execution_date)
+    validate_aggregate_rencency_segment(execution_date)
 
     ###################################
     # STEP 3: PROVISION -> CONSUMPTION: expose/publish data
