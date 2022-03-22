@@ -1,5 +1,7 @@
 # The Background
 
+## Business Problem/Context
+
 The Data Engineering team is collaborating with the Marketing Team on the important project: "Churning
 Customer Reactivation".
 
@@ -7,8 +9,18 @@ The idea behind the project is to reactivate customers who left the platform and
 order frequency. The Marketing Team approaches the problem by sending vouchers to
 customers based on specific rules and customer attributes.
 
+## The Data
+
 The data provided in the assignment is the historical data of voucher assignments for
 customers. Each row is a voucher assigned to a customer.
+
+The data is provided in `minio/minio_data/data/zone_01_raw/data.parquet.gzip`. By the time you run the docker-compose, the data will be stored 
+in the Raw Zone of the data lake.
+
+## What we will build
+
+1. Data Pipeline: to generate customer segments, including data cleaning, optimization. Ultimately, the data pipeline is responsible to make the aggregated data available to read by the Backend API application.
+2. REST API application: to expose the most-used voucher value for a particular customer segment.
 
 # Architecture
 
@@ -46,6 +58,9 @@ docker-compose up --build
 ```
 
 Check if Minio is already up by going to your browser and open http://host-ip:9000, it will show a login screen (username=minioadmin, password: minioadmin).
+
+Check if the data provided exists. By the time you run the docker-compose, the data will be stored 
+in the Raw Zone of the data lake. Using Minio web console, check if the data exist at `s3://data/zone_01_raw/data.parquet.gzip`.
 
 Check if MySQL is already up by running this command
 ```
