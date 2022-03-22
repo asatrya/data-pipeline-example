@@ -191,7 +191,7 @@ tests/test_main.py ..                                                    [100%]
    - Idempotent: run multiple times, the result will be the same.
    - Deterministic: the result of data pipeline only determined by input parameters. In this case, we implement by parameterizing the `execution_date`.
    - These properties make the pipeline robust when run by orchestrators (ie: Airflow).
-1. Rest data between data processing jobs
+1. Rest data between data processing jobs (ideally each steps is implemented in separate python files and run by orchestrator. But for simplicity of POC, we put it in a single file and run as a job)
    - Each data processing step writes data to storage, and next step will read from storage
    - Good foundation for scalability
 1. Validating data after each step (for simplicity of this POC, we only validate that all required columns are exist)
@@ -202,7 +202,7 @@ tests/test_main.py ..                                                    [100%]
    - Good for maintainability (issue tracing, backfilling, retry, etc)
 
 
-# Assumptions & Questions
+# Assumptions
 
 * Batch daily processing
 * Voucher calculation is done per country_code basis

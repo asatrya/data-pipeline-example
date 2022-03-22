@@ -198,6 +198,9 @@ if __name__ == "__main__":
                         .config("spark.sql.sources.partitionOverwriteMode","dynamic")\
                         .getOrCreate()
 
+    # Note:
+    # Ideally each steps is implemented in separate python files and run by orchestrator.
+    # But for simplicity of POC, we put it in a single file and run as a job
 
     ###################################
     # STEP 1: RAW -> CURATED: cleaning, type assignment, standardization
