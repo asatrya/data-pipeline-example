@@ -194,9 +194,12 @@ tests/test_main.py ..                                                    [100%]
 1. Rest data between data processing jobs
    - Each data processing step writes data to storage, and next step will read from storage
    - Good foundation for scalability
-1. Validating data after each step
+1. Validating data after each step (for simplicity of this POC, we only validate that all required columns are exist)
    - Prevent silent errors
    - Never publish wrong data
+1. Functional paradigmn in data pipeline
+   - Each step will read and write (overwrite) in specific partition based on execution_date
+   - Good for maintainability (issue tracing, backfilling, retry, etc)
 
 
 # Assumptions & Questions
