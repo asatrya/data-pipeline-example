@@ -7,33 +7,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
 
 
-if __name__ == "__main__":
-
-    # parameters
-    parser = ArgumentParser()
-    parser.add_argument("-e", "--execution-date", dest="execution_date",
-                        help="execution date of job")
-
-    args = parser.parse_args()
-    execution_date = args.execution_date
-
-    # build spark session
-    spark = SparkSession.builder.appName("KoalasPostgresDemo")\
-                        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")\
-                        .config("spark.hadoop.fs.s3a.access.key", os.environ.get('AWS_ACCESS_KEY_ID'))\
-                        .config("spark.hadoop.fs.s3a.secret.key", os.environ.get('AWS_SECRET_ACCESS_KEY'))\
-                        .config("spark.hadoop.fs.s3a.path.style.access", True)\
-                        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")\
-                        .config("fs.s3a.connection.ssl.enabled", False)\
-                        .config("fs.s3a.signing-algorithm","S3SignerType")\
-                        .config("spark.sql.sources.partitionOverwriteMode","dynamic")\
-                        .getOrCreate()
-
-
-    ###################################
-    # STEP 1: RAW -> CURATED: cleaning, type assignment, standardization
-    ###################################
-
+def job_curate(execution_date: str):
     # read data
     df = spark.read.parquet("s3a://data/zone_01_raw/data.parquet.gzip")\
                     .where(col('timestamp') <= lit(execution_date))
@@ -71,10 +45,7 @@ if __name__ == "__main__":
     df.write.mode("overwrite").partitionBy("execution_date").parquet("s3a://data/zone_02_curated/vouchers")
 
 
-    ###################################
-    # STEP 2: CURATED -> PROVISION: aggregation
-    ###################################
-
+def job_aggregate_frequent_segment(execution_date: str):
     # read data
     df_curated = spark.read.option("basePath", "s3a://data/zone_02_curated/vouchers/")\
                             .parquet("s3a://data/zone_02_curated/vouchers/execution_date={}".format(execution_date.replace(':', '')))
@@ -106,6 +77,12 @@ if __name__ == "__main__":
                             .partitionBy("execution_date")\
                             .parquet("s3a://data/zone_03_provision/voucher_frequent_most_used")
 
+
+def job_aggregate_rencency_segment(execution_date: str):
+    # read data
+    df_curated = spark.read.option("basePath", "s3a://data/zone_02_curated/vouchers/")\
+                            .parquet("s3a://data/zone_02_curated/vouchers/execution_date={}".format(execution_date.replace(':', '')))
+
     # aggregate recency_segment
     recency_window = Window.partitionBy('country_code', 'recency_segment')\
                         .orderBy(desc('sum_total_orders'))\
@@ -134,16 +111,10 @@ if __name__ == "__main__":
                             .parquet("s3a://data/zone_03_provision/voucher_recency_most_used")
 
 
-    ###################################
-    # STEP 3: PROVISION -> CONSUMPTION: expose/publish data
-    ###################################
-
+def job_publish_frequent_segment(execution_date: str):
     # read data from provision zone
     df_provision_voucher_frequent = spark.read.option("basePath", "s3a://data/zone_03_provision/voucher_frequent_most_used/")\
                             .parquet("s3a://data/zone_03_provision/voucher_frequent_most_used/execution_date={}".format(execution_date.replace(':', '')))
-
-    df_provision_voucher_recency = spark.read.option("basePath", "s3a://data/zone_03_provision/voucher_recency_most_used/")\
-                            .parquet("s3a://data/zone_03_provision/voucher_recency_most_used/execution_date={}".format(execution_date.replace(':', '')))
 
     # write to mysql table
     df_provision_voucher_frequent.write.format('jdbc').options(
@@ -153,9 +124,60 @@ if __name__ == "__main__":
                                                 user='user',
                                                 password='password').mode('overwrite').save()
 
+
+def job_publish_recency_segment(execution_date: str):
+    # read data from provision zone
+    df_provision_voucher_recency = spark.read.option("basePath", "s3a://data/zone_03_provision/voucher_recency_most_used/")\
+                            .parquet("s3a://data/zone_03_provision/voucher_recency_most_used/execution_date={}".format(execution_date.replace(':', '')))
+
+    # write to mysql table
     df_recency_segment.write.format('jdbc').options(
                                                 url='jdbc:mysql://mysql/db',
                                                 driver='com.mysql.jdbc.Driver',
                                                 dbtable='voucher_recency_most_used',
                                                 user='user',
                                                 password='password').mode('overwrite').save()
+
+
+if __name__ == "__main__":
+
+    # parameters
+    parser = ArgumentParser()
+    parser.add_argument("-e", "--execution-date", dest="execution_date",
+                        help="execution date of job")
+
+    args = parser.parse_args()
+    execution_date = args.execution_date
+
+    # build spark session
+    spark = SparkSession.builder.appName("KoalasPostgresDemo")\
+                        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")\
+                        .config("spark.hadoop.fs.s3a.access.key", os.environ.get('AWS_ACCESS_KEY_ID'))\
+                        .config("spark.hadoop.fs.s3a.secret.key", os.environ.get('AWS_SECRET_ACCESS_KEY'))\
+                        .config("spark.hadoop.fs.s3a.path.style.access", True)\
+                        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")\
+                        .config("fs.s3a.connection.ssl.enabled", False)\
+                        .config("fs.s3a.signing-algorithm","S3SignerType")\
+                        .config("spark.sql.sources.partitionOverwriteMode","dynamic")\
+                        .getOrCreate()
+
+
+    ###################################
+    # STEP 1: RAW -> CURATED: cleaning, type assignment, standardization
+    ###################################
+
+    job_curate(execution_date)
+
+    ###################################
+    # STEP 2: CURATED -> PROVISION: aggregation
+    ###################################
+
+    job_aggregate_frequent_segment(execution_date)
+    job_aggregate_rencency_segment(execution_date)
+
+    ###################################
+    # STEP 3: PROVISION -> CONSUMPTION: expose/publish data
+    ###################################
+
+    job_publish_frequent_segment(execution_date)
+    job_publish_recency_segment(execution_date)
